@@ -17,12 +17,12 @@ raw_text = base_file.read()
 # raw_text = nltk.corpus.gutenberg.raw('/Users/praveenlawyantra/Desktop/Search-Engine-API/train.py')
 base_file.close()
 tokens = suggestion.tokenize(raw_text, pad_start=True, pad_end=True)
-model = suggestion.train(tokens, num=5)
+model = suggestion.train(tokens, num=2)
 
 print("\nSample token list : ", tokens[:10])
 print("\nTotal Tokens : ",len(tokens))
 
-with open('final.pickle', 'wb') as handle:
+with open('final11.pickle', 'wb') as handle:
     pickle.dump(model, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
