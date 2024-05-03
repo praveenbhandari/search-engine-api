@@ -11,7 +11,9 @@ from pinecone_text.sparse import BM25Encoder
 import mysql.connector
 from pydantic import BaseModel
 from datetime import datetime
-from nltk.corpus import stopwords
+# from nltk.corpus import stopwords
+
+from stop_words import get_stop_words
 from nltk.tokenize import word_tokenize
 from rank_bm25 import BM25Okapi
 from transformers import BertTokenizer, BertModel
@@ -25,8 +27,8 @@ import openai
 
 import pickle
  
-openai.api_key = "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"
-
+openai.api_key = "sk-proj-6ap4gFPQpDOmXfCNM62XT3BlbkFJbPldOQkFUe6LW0Jms6Gp"
+# sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 
 with open('final.pickle', 'rb') as handle:
     suggest_model = pickle.load(handle)
@@ -50,8 +52,9 @@ except:
 
 
 
-index_name = "searchengine"
-openai_api_key="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"
+index_name = "search-engine"
+openai_api_key="sk-proj-6ap4gFPQpDOmXfCNM62XT3BlbkFJbPldOQkFUe6LW0Jms6Gp"
+# sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 #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
 embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
 
@@ -60,14 +63,19 @@ embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
 #     api_key="9db53de5-e4af-4151-a24d-995577de48cf",  # find at app.pinecone.io a242896b-4f43-484a-9d48-a43fa5a71481
 #     environment="gcp-starter",  # next to api key in console
 # )
-pinecone=Pinecone(api_key="90c1d9cc-c37f-43d2-96f9-c9e7b9e53e92",  # find at app.pinecone.io a242896b-4f43-484a-9d48-a43fa5a71481
+pinecone=Pinecone(api_key="34e9a537-88b9-4b3a-b0ab-17fa43483230",  # find at app.pinecone.io a242896b-4f43-484a-9d48-a43fa5a71481
 )
 
 index = pinecone.Index(index_name)
-bm25= BM25Encoder().default()
+# bm25= BM25Encoder().default()
+bm25=BM25Encoder().load("bm25_values1.json")
+
+
 
 processed_context=[]
-stop_words = set(stopwords.words('english'))
+# stop_words = set(stopwords.words('english'))
+
+stop_words = list(get_stop_words('en'))  
 
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 model = BertModel.from_pretrained('bert-base-uncased')
@@ -561,16 +569,19 @@ def results(query):
     resultss = []
     for i in ids:
         # print("---------",pine[i].metadata["Case Name"])
-        if pine[i].metadata["Case Name"] == "Not Available" or pine[i].metadata["Case Name"] == "Not found"  :
-                resultss.append(("Relevant:"+score[i], pine[i], q_score[i]))
-        else:
-            # print("elseeeeee",pine[i].metadata["Case Name"])
-        
-            if float(score[i]) < 0:
-                resultss.append((0, pine[i], (0, 0, 0)))
-            else: 
-                resultss.append((score[i], pine[i], q_score[i]))
-    
+        try:
+            if pine[i].metadata["Case Name"] == "Not Available" or pine[i].metadata["Case Name"] == "Not found"  :
+                    resultss.append(("Relevant:"+score[i], pine[i], q_score[i]))
+            else:
+                # print("elseeeeee",pine[i].metadata["Case Name"])
+            
+                if float(score[i]) < 0:
+                    resultss.append((0, pine[i], (0, 0, 0)))
+                else: 
+                    resultss.append((score[i], pine[i], q_score[i]))
+        except Exception as e:
+            print(e)
+            resultss.append(("Relevant:"+score[i], pine[i], q_score[i]))
     for score_value, document, q_score_value in resultss:
         document.metadata["Date"] = get_date(document)  # Set the value of the Date field in document.metadata
 
@@ -708,12 +719,38 @@ def sim_test(query):
     # print(sparse_dict_tokens)
     return sparse_dict_tokens
 
+# def sim_test(query):
+#     # Ensure tokenizer1 and model1 are defined and correctly initialized outside this function
+#     tokens = tokenizer1(query, return_tensors='pt')
+#     output = model1(**tokens)
+    
+#     # Apply ReLU to the logits and calculate weights
+#     weights = torch.log1p(torch.relu(output.logits)) * tokens.attention_mask.unsqueeze(-1)
+#     max_weights, _ = torch.max(weights, dim=1)
+    
+#     # Get the indices of active tokens
+#     active_tokens_indices = max_weights.nonzero(as_tuple=True)[0]
+    
+#     # Convert indices to tokens, ensuring indices are integers
+#     idx2token = {idx: token for token, idx in tokenizer1.get_vocab().items()}
+#     token_weights = {idx2token[idx.item()]: round(weight.item(), 2) for idx, weight in zip(active_tokens_indices, max_weights[active_tokens_indices])}
+    
+#     # Sort tokens by their weights in descending order
+#     sorted_tokens = dict(sorted(token_weights.items(), key=lambda item: item[1], reverse=True))
+    
+#     return sorted_tokens
+
 def querr(query):
     words = [w for w, s in sim_test(query).items() if len(w) > 2]
     
     wordss=[]
+    
+    wordss.append(query)
     a=['procedural', 'applicant', 'case', 'citations', 'communication', 'court', 'date', 'decisions', 'details', 'document', 'history', 'id', 'impact', 'involved', 'issue','judges', 'key', 'legal', 'matter', 'parties', 'points', 'principle', 'procedural', 'references', 'representatives', 'rulings','significance', 'situation', 'subject', 'submission', 'substantive', 'summary', 'tribunal', 'victim']
-
+    # a.append(stop_words)
+    for i in stop_words:
+        a.append(i)
+    # print(a)
     for i in words:
         # print(i)
         if i in a:
@@ -724,8 +761,13 @@ def querr(query):
             wordss.append(i)    
         # print(words)
     # lem=[words]
-    wordss.append(query)
-    print(wordss)
+    seen = set()
+    unique_list = []
+    for item in wordss:
+        if item not in seen:
+            unique_list.append(item)
+            seen.add(item)
+    print(unique_list)
     # print(lem)
     # words_string = " "
     # for i in words[:5]:
@@ -734,7 +776,7 @@ def querr(query):
     # print(words_string)
     resultss,ids,q_score=results(query)  
 # results("ICC01/12-01/18")  
-    return resultss,ids,wordss,q_score
+    return resultss,ids,unique_list[:9],q_score
 
 # def lemmatize(words):
 #     b=set()
