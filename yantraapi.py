@@ -26,8 +26,9 @@ from collections import defaultdict
 import openai
 
 import pickle
- 
-openai.api_key = "sk-proj-6ap4gFPQpDOmXfCNM62XT3BlbkFJbPldOQkFUe6LW0Jms6Gp"
+from dotenv import load_dotenv, dotenv_values 
+import os
+openai.api_key = os.getenv("openai_api")
 # sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 
 with open('final.pickle', 'rb') as handle:
@@ -53,7 +54,7 @@ except:
 
 
 index_name = "search-engine"
-openai_api_key="sk-proj-6ap4gFPQpDOmXfCNM62XT3BlbkFJbPldOQkFUe6LW0Jms6Gp"
+openai_api_key=os.getenv("openai_api")
 # sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 #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
 embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
@@ -63,7 +64,8 @@ embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
 #     api_key="9db53de5-e4af-4151-a24d-995577de48cf",  # find at app.pinecone.io a242896b-4f43-484a-9d48-a43fa5a71481
 #     environment="gcp-starter",  # next to api key in console
 # )
-pinecone=Pinecone(api_key="34e9a537-88b9-4b3a-b0ab-17fa43483230",  # find at app.pinecone.io a242896b-4f43-484a-9d48-a43fa5a71481
+
+pinecone=Pinecone(api_key=os.getenv("pinecone_api"),  # find at app.pinecone.io a242896b-4f43-484a-9d48-a43fa5a71481
 )
 
 index = pinecone.Index(index_name)
