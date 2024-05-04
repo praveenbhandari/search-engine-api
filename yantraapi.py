@@ -1,12 +1,15 @@
 
-from fastapi import FastAPI,APIRouter,Body
-from langchain.embeddings import OpenAIEmbeddings
+from fastapi import FastAPI,APIRouter
+# from langchain.embeddings import OpenAIEmbeddings
+# from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from fastapi.middleware.cors import CORSMiddleware
 # import pinecone
 from pinecone import Pinecone
 from langserve import add_routes
 # from langchain.vectorstores import Pinecone
-from langchain.retrievers import PineconeHybridSearchRetriever
+# from langchain.retrievers import PineconeHybridSearchRetriever
+from langchain_community.retrievers import PineconeHybridSearchRetriever
 from pinecone_text.sparse import BM25Encoder
 import mysql.connector
 from pydantic import BaseModel
@@ -26,15 +29,16 @@ from collections import defaultdict
 import openai
 
 import pickle
-from dotenv import load_dotenv, dotenv_values 
+# from dotenv import load_dotenv, dotenv_values 
 import os
-openai.api_key = os.getenv("openai_api")
+openai.api_key = os.getenv("sk-proj-6ap4gFPQpDOmXfCNM62XT3BlbkFJbPldOQkFUe6LW0Jms6Gp")
 # sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 
 with open('final.pickle', 'rb') as handle:
     suggest_model = pickle.load(handle)
 
-
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 
 mydb = mysql.connector.connect(
@@ -54,10 +58,10 @@ except:
 
 
 index_name = "search-engine"
-openai_api_key=os.getenv("openai_api")
+openai_api_key=os.getenv("sk-proj-6ap4gFPQpDOmXfCNM62XT3BlbkFJbPldOQkFUe6LW0Jms6Gp")
 # sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 #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
-embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
+embeddings = OpenAIEmbeddings(openai_api_key="sk-proj-6ap4gFPQpDOmXfCNM62XT3BlbkFJbPldOQkFUe6LW0Jms6Gp")
 
 # initialize pinecone
 # pinecone.init(
@@ -65,7 +69,7 @@ embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
 #     environment="gcp-starter",  # next to api key in console
 # )
 
-pinecone=Pinecone(api_key=os.getenv("pinecone_api"),  # find at app.pinecone.io a242896b-4f43-484a-9d48-a43fa5a71481
+pinecone=Pinecone(api_key="34e9a537-88b9-4b3a-b0ab-17fa43483230",  # find at app.pinecone.io a242896b-4f43-484a-9d48-a43fa5a71481
 )
 
 index = pinecone.Index(index_name)
@@ -212,6 +216,8 @@ model = BertModel.from_pretrained('bert-base-uncased')
 def tokenize_documents(documents):
     tokenized_docs = [tokenizer.tokenize(doc) for doc in documents]
     bm25 = BM25Okapi(tokenized_docs)
+    # bm25=BM25Encoder().load("bm25_values1.json")
+
     # print(bm25.doc_freqs)
     # print(bm25.corpus_size)
     return bm25
@@ -268,7 +274,7 @@ def predict_term_weights(query):
 def search(docs, query):
     # Tokenize the documents and build BM25 encoder
     bm25 = tokenize_documents(docs)
-
+    # bm25=BM25Encoder().load("bm25_values1.json")
     # Predict term weights using BERT
     term_weights = predict_term_weights(query)
 
