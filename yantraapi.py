@@ -285,6 +285,8 @@ def search(docs, query):
         for doc_id, score in enumerate(term_scores):
             scores[doc_id] += score * weight
 
+
+
     # Calculate word frequency scores for query
     query_score = [word_frequency_scores(doc, query.split()) for doc in docs]
 
