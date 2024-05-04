@@ -1,17 +1,22 @@
 
-from fastapi import FastAPI,APIRouter,Body
-from langchain.embeddings import OpenAIEmbeddings
+from fastapi import FastAPI,APIRouter
+# from langchain.embeddings import OpenAIEmbeddings
+# from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from fastapi.middleware.cors import CORSMiddleware
 # import pinecone
 from pinecone import Pinecone
 from langserve import add_routes
 # from langchain.vectorstores import Pinecone
-from langchain.retrievers import PineconeHybridSearchRetriever
+# from langchain.retrievers import PineconeHybridSearchRetriever
+from langchain_community.retrievers import PineconeHybridSearchRetriever
 from pinecone_text.sparse import BM25Encoder
 import mysql.connector
 from pydantic import BaseModel
 from datetime import datetime
-from nltk.corpus import stopwords
+# from nltk.corpus import stopwords
+
+from stop_words import get_stop_words
 from nltk.tokenize import word_tokenize
 from rank_bm25 import BM25Okapi
 from transformers import BertTokenizer, BertModel
@@ -24,14 +29,16 @@ from collections import defaultdict
 import openai
 
 import pickle
- 
-openai.api_key = "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"
-
+# from dotenv import load_dotenv, dotenv_values 
+import os
+openai.api_key = os.getenv("sk-proj-6ap4gFPQpDOmXfCNM62XT3BlbkFJbPldOQkFUe6LW0Jms6Gp")
+# sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 
 with open('final.pickle', 'rb') as handle:
     suggest_model = pickle.load(handle)
 
-
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 
 mydb = mysql.connector.connect(
@@ -50,24 +57,31 @@ except:
 
 
 
-index_name = "dev"
-openai_api_key="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"
+index_name = "search-engine"
+openai_api_key=os.getenv("sk-proj-6ap4gFPQpDOmXfCNM62XT3BlbkFJbPldOQkFUe6LW0Jms6Gp")
+# sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 #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
-embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
+embeddings = OpenAIEmbeddings(openai_api_key="sk-proj-6ap4gFPQpDOmXfCNM62XT3BlbkFJbPldOQkFUe6LW0Jms6Gp")
 
 # initialize pinecone
 # pinecone.init(
 #     api_key="9db53de5-e4af-4151-a24d-995577de48cf",  # find at app.pinecone.io a242896b-4f43-484a-9d48-a43fa5a71481
 #     environment="gcp-starter",  # next to api key in console
 # )
-pinecone=Pinecone(api_key="9db53de5-e4af-4151-a24d-995577de48cf",  # find at app.pinecone.io a242896b-4f43-484a-9d48-a43fa5a71481
+
+pinecone=Pinecone(api_key="34e9a537-88b9-4b3a-b0ab-17fa43483230",  # find at app.pinecone.io a242896b-4f43-484a-9d48-a43fa5a71481
 )
 
 index = pinecone.Index(index_name)
-bm25= BM25Encoder().default()
+# bm25= BM25Encoder().default()
+bm25=BM25Encoder().load("bm25_values1.json")
+
+
 
 processed_context=[]
-stop_words = set(stopwords.words('english'))
+# stop_words = set(stopwords.words('english'))
+
+stop_words = list(get_stop_words('en'))  
 
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 model = BertModel.from_pretrained('bert-base-uncased')
@@ -202,6 +216,8 @@ model = BertModel.from_pretrained('bert-base-uncased')
 def tokenize_documents(documents):
     tokenized_docs = [tokenizer.tokenize(doc) for doc in documents]
     bm25 = BM25Okapi(tokenized_docs)
+    # bm25=BM25Encoder().load("bm25_values1.json")
+
     # print(bm25.doc_freqs)
     # print(bm25.corpus_size)
     return bm25
@@ -213,7 +229,7 @@ def word_frequency_scores(doc, words):
     doc_words = normalized_doc.split()
     total_words = float(len(doc_words))
     total_score = 0.0
-    
+    # print(words)
     # Calculate term frequency for each word and add to total score
     for word in words:
         normalized_word = word.lower()
@@ -224,12 +240,14 @@ def word_frequency_scores(doc, words):
         else:
             tf = 0
         total_score += tf
-    
+    average_score=0
     # Calculate the average score if there are words
-    if words:
-        average_score =  len(words) / total_score
-    else:
-        average_score = 0
+    if total_score > 0.0:
+        if words:
+            # print(len(words),total_score,words)
+            average_score =  len(words) / total_score
+        else:
+            average_score = 0
 
     return (word_count,total_words,average_score)
 
@@ -253,45 +271,76 @@ def predict_term_weights(query):
     tokens = tokenizer.convert_ids_to_tokens(inputs["input_ids"].squeeze().tolist())
     return dict(zip(tokens, weights_softmax_np))
 
-
-def search(docs,query):
+def search(docs, query):
+    # Tokenize the documents and build BM25 encoder
     bm25 = tokenize_documents(docs)
+    # bm25=BM25Encoder().load("bm25_values1.json")
+    # Predict term weights using BERT
     term_weights = predict_term_weights(query)
-    weighted_query = [(term, weight) for term, weight in term_weights.items()]
-    # print()
-    # print(weighted_query)
+
+    # Calculate scores for each document
     scores = defaultdict(float)
-    for term, weight in weighted_query:
+    for term, weight in term_weights.items():
         term_scores = bm25.get_scores([term])
-        # print(term_scores,".......",weight)
         for doc_id, score in enumerate(term_scores):
-            # print(score,"--------",weight)
             scores[doc_id] += score * weight
-    
-    # query_score = [word_frequency_scores(doc, query.split()) for doc in docs]
+
+
+
+    # Calculate word frequency scores for query
     query_score = [word_frequency_scores(doc, query.split()) for doc in docs]
-    # print(scores)
-    # query_score=[]
+
+    # Normalize and scale scores
+    max_score = max(scores.values()) if scores else 0
+    scaled_scores = {doc_id: (score / max_score * 100) if max_score > 0 else 0 for doc_id, score in scores.items()}
+
+    # Sort documents by scaled scores in descending order
+    sorted_docs = sorted(scaled_scores.items(), key=lambda x: x[1], reverse=True)
+
+    # Return scores, document IDs, documents, and word frequency scores
+    return [f"{j:.2f}" for _, j in scaled_scores.items()], [doc_id for doc_id, _ in sorted_docs], [docs[doc_id] for doc_id, _ in sorted_docs], query_score
+
+
+
+
+# def search(docs,query):
+#     bm25 = tokenize_documents(docs)
+#     term_weights = predict_term_weights(query)
+#     weighted_query = [(term, weight) for term, weight in term_weights.items()]
+#     # print()
+#     # print(weighted_query)
+#     scores = defaultdict(float)
+#     for term, weight in weighted_query:
+#         term_scores = bm25.get_scores([term])
+#         # print(term_scores,".......",weight)
+#         for doc_id, score in enumerate(term_scores):
+#             # print(score,"--------",weight)
+#             scores[doc_id] += score * weight
+    
+#     # query_score = [word_frequency_scores(doc, query.split()) for doc in docs]
+#     query_score = [word_frequency_scores(doc, query.split()) for doc in docs]
+#     # print(scores)
+#     # query_score=[]
 
     
 
-    doc_score_dict = {doc: score for doc, score in zip(docs, query_score)}
+#     doc_score_dict = {doc: score for doc, score in zip(docs, query_score)}
 
-    max_score = max(scores.values()) if scores else 0     
-    # print(q.)
-    # sorted_docs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    # sorted_ids = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    # sorted_cases = sorted(scores.items(), key=lambda x: x["Document Date"])
-    # sorted_docs_with_scores = [(docs[doc_id], scores) for doc_id, scores in sorted_docs]
-    scaled_scores = {doc_id: (score / max_score * 100) if max_score > 0 else 0 for doc_id, score in scores.items()}
-    sc=[f"{j:.2f}" for _,j in scaled_scores.items()]
-    # for k in scaled_scores.items():
-    #     s
-    sorted_docs = sorted(scaled_scores.items(), key=lambda x: x[1], reverse=True)
-    # qq=sorted(q.items(), key=lambda x: x[1], reverse=True)
-    # sorted_cases    
-    # print((sorted_docs))
-    return sc,[doc_id for doc_id, _ in sorted_docs],[docs[doc_id] for doc_id, _ in sorted_docs],query_score
+#     max_score = max(scores.values()) if scores else 0     
+#     # print(q.)
+#     # sorted_docs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+#     # sorted_ids = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+#     # sorted_cases = sorted(scores.items(), key=lambda x: x["Document Date"])
+#     # sorted_docs_with_scores = [(docs[doc_id], scores) for doc_id, scores in sorted_docs]
+#     scaled_scores = {doc_id: (score / max_score * 100) if max_score > 0 else 0 for doc_id, score in scores.items()}
+#     sc=[f"{j:.2f}" for _,j in scaled_scores.items()]
+#     # for k in scaled_scores.items():
+#     #     s
+#     sorted_docs = sorted(scaled_scores.items(), key=lambda x: x[1], reverse=True)
+#     # qq=sorted(q.items(), key=lambda x: x[1], reverse=True)
+#     # sorted_cases    
+#     # print((sorted_docs))
+#     return sc,[doc_id for doc_id, _ in sorted_docs],[docs[doc_id] for doc_id, _ in sorted_docs],query_score
 
 
 # def search_and_scale(docs, query):
@@ -496,7 +545,7 @@ def results(query):
         try:
             date_str = document.metadata.get("Date", "Not found")
             if date_str == "Not found":
-                return "9999-12-31"
+                return "0000-01-01"
 
             for fmt in ['%m-%d-%Y', '%m-%B-%Y', '%d %B %Y']:
                 try:
@@ -521,7 +570,7 @@ def results(query):
                 return date_str
             else:
                 print("Date format not recognized", date_str)
-                return None
+                return "11-11-11"
         except KeyError:
             print("Date not found in document metadata")
             return None
@@ -530,16 +579,19 @@ def results(query):
     resultss = []
     for i in ids:
         # print("---------",pine[i].metadata["Case Name"])
-        if pine[i].metadata["Case Name"] == "Not Available" or pine[i].metadata["Case Name"] == "Not found"  :
-                resultss.append(("Relevant:"+score[i], pine[i], q_score[i]))
-        else:
-            # print("elseeeeee",pine[i].metadata["Case Name"])
-        
-            if float(score[i]) < 0:
-                resultss.append((0, pine[i], (0, 0, 0)))
-            else: 
-                resultss.append((score[i], pine[i], q_score[i]))
-    
+        try:
+            if pine[i].metadata["Case Name"] == "Not Available" or pine[i].metadata["Case Name"] == "Not found"  :
+                    resultss.append(("Relevant:"+score[i], pine[i], q_score[i]))
+            else:
+                # print("elseeeeee",pine[i].metadata["Case Name"])
+            
+                if float(score[i]) < 0:
+                    resultss.append((0, pine[i], (0, 0, 0)))
+                else: 
+                    resultss.append((score[i], pine[i], q_score[i]))
+        except Exception as e:
+            print(e)
+            resultss.append(("Relevant:"+score[i], pine[i], q_score[i]))
     for score_value, document, q_score_value in resultss:
         document.metadata["Date"] = get_date(document)  # Set the value of the Date field in document.metadata
 
@@ -677,11 +729,38 @@ def sim_test(query):
     # print(sparse_dict_tokens)
     return sparse_dict_tokens
 
+# def sim_test(query):
+#     # Ensure tokenizer1 and model1 are defined and correctly initialized outside this function
+#     tokens = tokenizer1(query, return_tensors='pt')
+#     output = model1(**tokens)
+    
+#     # Apply ReLU to the logits and calculate weights
+#     weights = torch.log1p(torch.relu(output.logits)) * tokens.attention_mask.unsqueeze(-1)
+#     max_weights, _ = torch.max(weights, dim=1)
+    
+#     # Get the indices of active tokens
+#     active_tokens_indices = max_weights.nonzero(as_tuple=True)[0]
+    
+#     # Convert indices to tokens, ensuring indices are integers
+#     idx2token = {idx: token for token, idx in tokenizer1.get_vocab().items()}
+#     token_weights = {idx2token[idx.item()]: round(weight.item(), 2) for idx, weight in zip(active_tokens_indices, max_weights[active_tokens_indices])}
+    
+#     # Sort tokens by their weights in descending order
+#     sorted_tokens = dict(sorted(token_weights.items(), key=lambda item: item[1], reverse=True))
+    
+#     return sorted_tokens
+
 def querr(query):
     words = [w for w, s in sim_test(query).items() if len(w) > 2]
+    
     wordss=[]
+    
+    wordss.append(query)
     a=['procedural', 'applicant', 'case', 'citations', 'communication', 'court', 'date', 'decisions', 'details', 'document', 'history', 'id', 'impact', 'involved', 'issue','judges', 'key', 'legal', 'matter', 'parties', 'points', 'principle', 'procedural', 'references', 'representatives', 'rulings','significance', 'situation', 'subject', 'submission', 'substantive', 'summary', 'tribunal', 'victim']
-
+    # a.append(stop_words)
+    for i in stop_words:
+        a.append(i)
+    # print(a)
     for i in words:
         # print(i)
         if i in a:
@@ -692,6 +771,13 @@ def querr(query):
             wordss.append(i)    
         # print(words)
     # lem=[words]
+    seen = set()
+    unique_list = []
+    for item in wordss:
+        if item not in seen:
+            unique_list.append(item)
+            seen.add(item)
+    print(unique_list)
     # print(lem)
     # words_string = " "
     # for i in words[:5]:
@@ -700,7 +786,7 @@ def querr(query):
     # print(words_string)
     resultss,ids,q_score=results(query)  
 # results("ICC01/12-01/18")  
-    return resultss,ids,wordss,q_score
+    return resultss,ids,unique_list[:9],q_score
 
 # def lemmatize(words):
 #     b=set()

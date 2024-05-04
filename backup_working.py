@@ -26,7 +26,7 @@ import openai
 
 import pickle
  
-openai.api_key = "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"
+openai.api_key = "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"
 
 
 with open('final11.pickle', 'rb') as handle:
@@ -51,7 +51,7 @@ except:
 
 
 index_name = "dev"
-openai_api_key="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"
+openai_api_key="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"
 embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
 
 pinecone=Pinecone(api_key="9db53de5-e4af-4151-a24d-995577de48cf",  )
@@ -76,7 +76,7 @@ stemmer = PorterStemmer()
 
 
 retriever = PineconeHybridSearchRetriever(
-    embeddings=embeddings, sparse_encoder=bm25, index=index,alpha=0.1,top_k=100,
+    embeddings=embeddings, sparse_encoder=bm25, index=index,alpha=0.1,top_k=20,
 )
 
 app = FastAPI(
@@ -127,7 +127,7 @@ def api_call_worker(api_queue, _userPrompt, client, _systemPrompt):
     try:
         print("API call worker started.")
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo-1106",
+            model="gpt-3.5-turbo-0125",
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": _systemPrompt},
@@ -141,11 +141,11 @@ def api_call_worker(api_queue, _userPrompt, client, _systemPrompt):
         api_queue.put(e)
 
 def generate_synonyms(word, max_retries=3, timeout=60):
-    OPENAI_API_KEY = "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"  # Replace with your actual API key
+    OPENAI_API_KEY = "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"  # Replace with your actual API key
     client = OpenAI(api_key=OPENAI_API_KEY)
 
     _systemPrompt = """
-    You are Google, thesaurus, your job is to give me synonyms or the most relevent words
+    You are Google, thesaurus, your job is to give me one word for the given word or give the synonym.
       
       JSON SCHEMA
      {
@@ -158,7 +158,7 @@ def generate_synonyms(word, max_retries=3, timeout=60):
                     "items": {
                         "type": "string"
                     },
-                "minItems": 15,
+                "minItems": 20,
                 "maxItems": 30
             },
         }
@@ -231,7 +231,6 @@ def word_frequency_scores(doc, words):
     for word in words:
         normalized_word = word.lower()
         word_count = float(doc_words.count(normalized_word))
-        
         if total_words > 0:
             tf = word_count / total_words
         else:
@@ -245,31 +244,6 @@ def word_frequency_scores(doc, words):
 
     return (word_count, total_words, average_score)
 
-# def word_frequency_scores(doc, words):
-#     translator = str.maketrans('', '', string.punctuation)
-#     normalized_doc = doc.lower().translate(translator)
-#     doc_words = normalized_doc.split()
-#     total_words = float(len(doc_words))
-#     total_score = 0.0
-#     for word in words:
-#         normalized_word = word.lower()
-#         word_count = float(doc_words.count(normalized_word))
-        
-#         if total_words > 0:
-#             tf = word_count / total_words
-#         else:
-#             tf = 0
-#         total_score += tf
-    
-#     if words:
-#         average_score =  len(words) / total_score
-#     else:
-#         average_score = 0
-
-#     return (word_count,total_words,average_score)
-
-
-
 def predict_term_weights(query):
     inputs = tokenizer(query, return_tensors="pt", padding=True, truncation=True)
     with torch.no_grad():
@@ -282,27 +256,168 @@ def predict_term_weights(query):
     return dict(zip(tokens, weights_softmax_np))
 
 
-def search(docs,query):
+def search(docs, query):
     bm25 = tokenize_documents(docs)
     term_weights = predict_term_weights(query)
     weighted_query = [(term, weight) for term, weight in term_weights.items()]
     scores = defaultdict(float)
-    for term, weight in weighted_query:
-        term_scores = bm25.get_scores([term])
-        for doc_id, score in enumerate(term_scores):
-            scores[doc_id] += score * weight
     
+    # Check for exact match with quotes
+    if '"' in query:
+        quoted_phrases = re.findall(r'"([^"]*)"', query)
+        for phrase in quoted_phrases:
+            for term, weight in weighted_query:
+                if term.lower() in phrase.lower():
+                    term_scores = bm25.get_scores([term])
+                    for doc_id, score in enumerate(term_scores):
+                        scores[doc_id] += score * weight * 2  # Double the score for words in quotes
+    
+    # If no exact match found, prioritize values inside quotes
+    if not scores and '"' in query:
+        for term, weight in weighted_query:
+            if term.startswith('"') and term.endswith('"'):
+                term_scores = bm25.get_scores([term])
+                for doc_id, score in enumerate(term_scores):
+                    scores[doc_id] += score * weight * 3  # Triple the score for values inside quotes
+
+    # If no match found, assign default priority
+    if not scores:
+        # Split the query into individual terms and check their presence in documents
+        for term, weight in weighted_query:
+            term_scores = bm25.get_scores([term])
+            for doc_id, score in enumerate(term_scores):
+                scores[doc_id] += score * weight  # Default priority
+    
+    # Calculate scores based on word frequency
     query_score = [word_frequency_scores(doc, query.split()) for doc in docs]
 
+    max_score = max(scores.values()) if scores else 0
+    scaled_scores = {doc_id: (score / max_score * 100) if max_score > 0 else 0 for doc_id, score in scores.items()}
+    sc = [f"{j:.2f}" for _, j in scaled_scores.items()]
+    sorted_docs = sorted(scaled_scores.items(), key=lambda x: x[1], reverse=True)
+    print(sorted_docs)
+    return sc, [doc_id for doc_id, _ in sorted_docs], [docs[doc_id] for doc_id, _ in sorted_docs], query_score
+
+
+
+# def search(docs, query):
+#     bm25 = tokenize_documents(docs)
+#     term_weights = predict_term_weights(query)
+#     weighted_query = [(term, weight) for term, weight in term_weights.items()]
+#     scores = defaultdict(float)
+    
+#     # Check if the exact given query matches any document
+#     exact_match_doc_ids = [i for i, doc in enumerate(docs) if query.lower() in doc.lower()]
+#     if exact_match_doc_ids:
+#         for doc_id in exact_match_doc_ids:
+#             scores[doc_id] += 100  # Assign highest priority for exact match
+
+#     exact_match_doc_ids = [i for i, doc in enumerate(docs) if query.replace('"',"").lower() in doc.lower()]
+#     if exact_match_doc_ids:
+#         for doc_id in exact_match_doc_ids:
+#             scores[doc_id] += 100  # Assign highest priority for exact match
+    
+#     # If no exact match, prioritize words in quotes
+#     if not exact_match_doc_ids:
+#         quoted_phrases = re.findall(r'"([^"]*)"', query)
+#         for phrase in quoted_phrases:
+#             for term, weight in weighted_query:
+#                 if term.lower() in phrase.lower():
+#                     term_scores = bm25.get_scores([term])
+#                     for doc_id, score in enumerate(term_scores):
+#                         scores[doc_id] += score * weight * 2  # Double the score for words in quotes
+    
+#     # If no match found, prioritize values inside quotes
+#     if not scores:
+#         for term, weight in weighted_query:
+#             if term.startswith('"') and term.endswith('"'):
+#                 term_scores = bm25.get_scores([term])
+#                 for doc_id, score in enumerate(term_scores):
+#                     scores[doc_id] += score * weight * 3  # Triple the score for values inside quotes
+#             else:
+#                 term_scores = bm25.get_scores([term])
+                
+#                 for doc_id, score in enumerate(term_scores):
+#                     scores[doc_id] += score * weight
+
+
+#     # Calculate scores based on word frequency
+#     query_score = [word_frequency_scores(doc, query.split()) for doc in docs]
+
+#     max_score = max(scores.values()) if scores else 0
+#     scaled_scores = {doc_id: (score / max_score * 100) if max_score > 0 else 0 for doc_id, score in scores.items()}
+#     sc = [f"{j:.2f}" for _, j in scaled_scores.items()]
+#     sorted_docs = sorted(scaled_scores.items(), key=lambda x: x[1], reverse=True)
+#     return sc, [doc_id for doc_id, _ in sorted_docs], [docs[doc_id] for doc_id, _ in sorted_docs], query_score
+
+# def search(docs, query):
+#     bm25 = tokenize_documents(docs)
+#     term_weights = predict_term_weights(query)
+#     weighted_query = [(term, weight) for term, weight in term_weights.items()]
+#     scores = defaultdict(float)
+    
+#     # Check for exact match without quotes
+#     exact_match_doc_ids = [i for i, doc in enumerate(docs) if query.lower() in doc.lower()]
+#     if exact_match_doc_ids:
+#         for doc_id in exact_match_doc_ids:
+#             scores[doc_id] += 100  # Assign highest priority for exact match
+    
+#     # Check for exact match with quotes
+#     if '"' in query:
+#         quoted_phrases = re.findall(r'"([^"]*)"', query)
+#         for phrase in quoted_phrases:
+#             for term, weight in weighted_query:
+#                 if term.lower() in phrase.lower():
+#                     term_scores = bm25.get_scores([term])
+#                     for doc_id, score in enumerate(term_scores):
+#                         scores[doc_id] += score * weight * 2  # Double the score for words in quotes
+    
+#     # If no exact match found, prioritize values inside quotes
+#     if not scores and '"' in query:
+#         for term, weight in weighted_query:
+#             if term.startswith('"') and term.endswith('"'):
+#                 term_scores = bm25.get_scores([term])
+#                 for doc_id, score in enumerate(term_scores):
+#                     scores[doc_id] += score * weight * 3  # Triple the score for values inside quotes
+
+#     # If no match found, assign default priority
+#     if not scores:
+#         for term, weight in weighted_query:
+#             term_scores = bm25.get_scores([term])
+#             for doc_id, score in enumerate(term_scores):
+#                 scores[doc_id] += score * weight  # Default priority
+    
+#     # Calculate scores based on word frequency
+#     query_score = [word_frequency_scores(doc, query.split()) for doc in docs]
+
+#     max_score = max(scores.values()) if scores else 0
+#     scaled_scores = {doc_id: (score / max_score * 100) if max_score > 0 else 0 for doc_id, score in scores.items()}
+#     sc = [f"{j:.2f}" for _, j in scaled_scores.items()]
+#     sorted_docs = sorted(scaled_scores.items(), key=lambda x: x[1], reverse=True)
+#     print(sorted_docs)
+#     return sc, [doc_id for doc_id, _ in sorted_docs], [docs[doc_id] for doc_id, _ in sorted_docs], query_score
+
+# def search(docs,query):
+#     bm25 = tokenize_documents(docs)
+#     term_weights = predict_term_weights(query)
+#     weighted_query = [(term, weight) for term, weight in term_weights.items()]
+#     scores = defaultdict(float)
+#     for term, weight in weighted_query:
+#         term_scores = bm25.get_scores([term])
+#         for doc_id, score in enumerate(term_scores):
+#             scores[doc_id] += score * weight
+    
+#     query_score = [word_frequency_scores(doc, query.split()) for doc in docs]
+
     
 
-    # doc_score_dict = {doc: score for doc, score in zip(docs, query_score)}
+#     # doc_score_dict = {doc: score for doc, score in zip(docs, query_score)}
 
-    max_score = max(scores.values()) if scores else 0     
-    scaled_scores = {doc_id: (score / max_score * 100) if max_score > 0 else 0 for doc_id, score in scores.items()}
-    sc=[f"{j:.2f}" for _,j in scaled_scores.items()]
-    sorted_docs = sorted(scaled_scores.items(), key=lambda x: x[1], reverse=True)
-    return sc,[doc_id for doc_id, _ in sorted_docs],[docs[doc_id] for doc_id, _ in sorted_docs],query_score
+#     max_score = max(scores.values()) if scores else 0     
+#     scaled_scores = {doc_id: (score / max_score * 100) if max_score > 0 else 0 for doc_id, score in scores.items()}
+#     sc=[f"{j:.2f}" for _,j in scaled_scores.items()]
+#     sorted_docs = sorted(scaled_scores.items(), key=lambda x: x[1], reverse=True)
+#     return sc,[doc_id for doc_id, _ in sorted_docs],[docs[doc_id] for doc_id, _ in sorted_docs],query_score
 
 def searchh(texttt):
   pine = retriever.get_relevant_documents(str(texttt))
@@ -443,13 +558,13 @@ def sim_test11(query):
     return relevant_tokens
 
 def querr(query):
-    ww = [w for w, s in sim_test(query).items() if len(w) > 2]
-    # words=list(json.loads(generate_synonyms(query))["words"])
+    # ww = [w for w, s in sim_test(query).items() if len(w) > 2]
+    ww=list(json.loads(generate_synonyms(query))["words"])
     # print("===",words)
     ww.append(query)
     words=[]
-    for i in ww:
-        words.append(i)
+    # for i in query.split(" "):
+    #     words.append(i.lower())
     wordss=[]
     a=['procedural', 'applicant', 'case', 'citations', 'communication', 'court', 'date', 'decisions', 'details', 'document', 'history', 'id', 'impact', 'involved', 'issue','judges', 'key', 'legal', 'matter', 'parties', 'points', 'principle', 'procedural', 'references', 'representatives', 'rulings','significance', 'situation', 'subject', 'submission', 'substantive', 'summary', 'tribunal', 'victim']
 
@@ -460,31 +575,37 @@ def querr(query):
             continue
         else:
             wordss.append(i)    
-  
+    for i in ww:
+        if i not in stop_words:
+            print(i)
+            wordss.append(i.lower())
     resultss,ids,q_score=results(query)  
     return resultss,ids,wordss,q_score
 
-
-
-def process_words(words):
-    lis=[]
-    pattern = r'"([^"]*)"|\S+'
-
-    extracted_words = re.findall(pattern, ' '.join(words))
-    if extracted_words:
-        lis.extend(word.strip('"') for word in extracted_words if word)
-    else:
-        lis.extend(words)
-    return lis
+# def process_words(words):
+#     lis=[]
+#     pattern = r'"([^"]*)"|\S+'
+#     extracted_words = re.findall(pattern, ' '.join(words))
+#     if extracted_words:
+#         lis.extend(word.strip('"') for word in extracted_words if word)
+#     else:
+#         lis.extend(words)
+#     return lis
 
 import re
 @my_router.post("/search")
 async def search_res(query: query_item):
     result,ids,word,q_score=querr(query.query)
     # words = re.findall(r'(\b\w+\b|"\w+\s\w+")', query)
-    process=process_words(word)
-    print("----",process)
-    return result,process,q_score
+
+    # process=process_words(word)
+    pattern = r'"([^"]*)"|\S+'
+    extracted_words = re.findall(pattern, ' '.join(word))
+    word.extend(word.strip('"') for word in extracted_words if word)
+    word.append(query.query.replace('"', ''))
+    print("----",word)
+
+    return result,word,q_score
 
 @my_router.post("/suggest")
 async def sugest(query: query_item):
