@@ -847,9 +847,14 @@ app.add_middleware(
 )
 
 app.include_router(my_router)
-
+ 
 add_routes(app, retriever,path="/chat")
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="localhost", port=8000)
+       
+       
+
+
+       
