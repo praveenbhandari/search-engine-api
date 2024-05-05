@@ -31,7 +31,7 @@ import openai
 import pickle
 # from dotenv import load_dotenv, dotenv_values 
 import os
-openai.api_key = os.getenv("sk-proj-QSpGoiHfD2Sgh9QITdxyT3BlbkFJ3CfhmXXGeIZ8YKPa44vg")
+openai.api_key = os.getenv("sk-proj-6ap4gFPQpDOmXfCNM62XT3BlbkFJbPldOQkFUe6LW0Jms6Gp")
 # sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 
 with open('final.pickle', 'rb') as handle:
@@ -58,10 +58,10 @@ except:
 
 
 index_name = "search-engine"
-openai_api_key=os.getenv("sk-proj-QSpGoiHfD2Sgh9QITdxyT3BlbkFJ3CfhmXXGeIZ8YKPa44vg")
+openai_api_key=os.getenv("sk-proj-6ap4gFPQpDOmXfCNM62XT3BlbkFJbPldOQkFUe6LW0Jms6Gp")
 # sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 #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
-embeddings = OpenAIEmbeddings(openai_api_key="sk-proj-QSpGoiHfD2Sgh9QITdxyT3BlbkFJ3CfhmXXGeIZ8YKPa44vg")
+embeddings = OpenAIEmbeddings(openai_api_key="sk-proj-6ap4gFPQpDOmXfCNM62XT3BlbkFJbPldOQkFUe6LW0Jms6Gp")
 
 # initialize pinecone
 # pinecone.init(
@@ -847,14 +847,9 @@ app.add_middleware(
 )
 
 app.include_router(my_router)
- 
+
 add_routes(app, retriever,path="/chat")
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="localhost", port=8000)
-       
-       
-
-
-       
