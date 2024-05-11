@@ -32,7 +32,7 @@ import openai
 import pickle
 # from dotenv import load_dotenv, dotenv_values 
 import os
-openai.api_key = os.getenv("sk-proj-GUneXFhnVChRPMyLDXwmT3BlbkFJ9ATxVMXhxXZLzipvqhCd")
+openai.api_key = os.getenv("sk-proj-dEYnSd1UOA3nFhTzlBj1T3BlbkFJ179qs6h9elueceBPvGk1")
 # sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 
 with open('final.pickle', 'rb') as handle:
@@ -67,10 +67,10 @@ mycursor = mydb.cursor()
 
 # mydb.execute('set max_allowed_packet=67108864')
 index_name = "search-engine"
-openai_api_key=os.getenv("sk-proj-GUneXFhnVChRPMyLDXwmT3BlbkFJ9ATxVMXhxXZLzipvqhCd")
+openai_api_key=os.getenv("sk-proj-dEYnSd1UOA3nFhTzlBj1T3BlbkFJ179qs6h9elueceBPvGk1")
 # sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 #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
-embeddings = OpenAIEmbeddings(openai_api_key="sk-proj-GUneXFhnVChRPMyLDXwmT3BlbkFJ9ATxVMXhxXZLzipvqhCd")
+embeddings = OpenAIEmbeddings(openai_api_key="sk-proj-dEYnSd1UOA3nFhTzlBj1T3BlbkFJ179qs6h9elueceBPvGk1")
 
 # initialize pinecone
 # pinecone.init(
