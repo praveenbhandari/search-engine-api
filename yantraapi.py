@@ -74,7 +74,7 @@ mycursor = mydb.cursor()
 
 
 
-mydb.execute('set max_allowed_packet=67108864')
+# mydb.execute('set max_allowed_packet=67108864')
 index_name = "search-engine"
 # sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 #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
