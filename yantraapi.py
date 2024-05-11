@@ -38,10 +38,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-openai_api_key=os.getenv("openai_api_key")
+openai_api_key1=os.getenv("openai_api_key")
 
-openai.api_key = openai_api_key
-print(openai_api_key)
+openai.api_key = openai_api_key1
+print(openai_api_key1)
 # sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 
 with open('final.pickle', 'rb') as handle:
@@ -63,14 +63,14 @@ mydb = mysql.connector.connect(
 
 mycursor = mydb.cursor()
 
-# try:
+try:
     
-#     mycursor.execute("use search_engine_dev")
-#     print("using db")
-# except:
-#     mycursor.execute("CREATE database search_engine_dev")
-#     mycursor.execute("use search_engine_dev")
-#     print("creating db")
+    mycursor.execute("use search_engine_dev")
+    print("using db")
+except:
+    mycursor.execute("CREATE database search_engine_dev")
+    mycursor.execute("use search_engine_dev")
+    print("creating db")
 
 
 
@@ -78,7 +78,7 @@ mycursor = mydb.cursor()
 index_name = "search-engine"
 # sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 #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
-embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
+embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key1)
 
 # initialize pinecone
 # pinecone.init(
@@ -912,13 +912,19 @@ class user(BaseModel):
 @my_router.post("/login")
 async def signup(user:user):
     try:
-        mycursor.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, name VARCHAR(255),email VARCHAR(255), phone VARCHAR(255),location VARCHAR(255), registered_on DATETIME)")
-        mycursor.execute("CREATE TABLE IF NOT EXISTS queries (id INTEGER PRIMARY KEY, user_id INT, query VARCHAR(255),ip VARCHAR(255), datetime DATETIME, location VARCHAR(255), FOREIGN KEY (user_id) REFERENCES users(user_id))")
-        mycursor.execute("CREATE TABLE IF NOT EXISTS sessions (id INTEGER PRIMARY KEY, ip VARCHAR(255), device VARCHAR(255),total_time VARCHAR(255), start_time DATETIME, end_time DATETIME)")
+        # mycursor.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, name VARCHAR(255),email VARCHAR(255), phone VARCHAR(255),location VARCHAR(255), registered_on DATETIME)")
+        # mycursor.execute("CREATE TABLE IF NOT EXISTS queries (id INTEGER PRIMARY KEY, user_id INT, query VARCHAR(255),ip VARCHAR(255), datetime DATETIME, location VARCHAR(255), FOREIGN KEY (user_id) REFERENCES users(user_id))")
+        # mycursor.execute("CREATE TABLE IF NOT EXISTS sessions (id INTEGER PRIMARY KEY, ip VARCHAR(255), device VARCHAR(255),total_time VARCHAR(255), start_time DATETIME, end_time DATETIME)")
+        mycursor.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255),email VARCHAR(255), phone VARCHAR(255),location VARCHAR(255), registered_on DATETIME)")
+        mycursor.execute("CREATE TABLE IF NOT EXISTS queries (id INTEGER AUTO_INCREMENT PRIMARY KEY, user_id INT, query VARCHAR(255),ip VARCHAR(255), datetime DATETIME, location VARCHAR(255), FOREIGN KEY (user_id) REFERENCES users(user_id))")
+        mycursor.execute("CREATE TABLE IF NOT EXISTS sessions (id INTEGER AUTO_INCREMENT PRIMARY KEY, ip VARCHAR(255), device VARCHAR(255),total_time VARCHAR(255), start_time DATETIME, end_time DATETIME)")
 
         # Check if user already exists
-        query = "SELECT user_id FROM users WHERE email = ? AND phone = ?"
-        res=mycursor.execute(query, (user.email, user.phone)).fetchone()
+        query = "SELECT user_id FROM users WHERE email = %s AND phone = %s"
+        # res=mycursor.execute(query, (user.email, user.phone)).fetchone()
+        mycursor.execute(query, (user.email, user.phone))
+        res=mycursor.fetchone()
+
         if res:
             return {"message": res[0]}
         else:
@@ -928,8 +934,10 @@ async def signup(user:user):
             mycursor.execute(sql, values)
             mydb.commit()
 
-            query = "SELECT user_id FROM users WHERE email = ? AND phone = ?"
-            res=mycursor.execute(query, (user.email, user.phone)).fetchone()
+            query = "SELECT user_id FROM users WHERE email = %s AND phone = %s"
+            # res=mycursor.execute(query, (user.email, user.phone)).fetchone()
+            mycursor.execute(query, (user.email, user.phone))
+            res=mycursor.fetchone()
             if res:
                 return {"message": res[0]}
 
