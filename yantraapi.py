@@ -51,15 +51,15 @@ import os
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 import sqlite3
 
-mydb = sqlite3.connect('user_data.db') 
+# mydb = sqlite3.connect('user_data.db') 
 
 
-# mydb = mysql.connector.connect(
-#   host="search-engine.ckkhapdb5dit.ap-south-1.rds.amazonaws.com",
-#   user="admin",
-#   password="Praveen123",
-#   # database="test"
-# )
+mydb = mysql.connector.connect(
+  host="search-engine.ckkhapdb5dit.ap-south-1.rds.amazonaws.com",
+  user="admin",
+  password="Praveen123",
+  # database="test"
+)
 
 mycursor = mydb.cursor()
 
@@ -74,7 +74,7 @@ mycursor = mydb.cursor()
 
 
 
-# mydb.execute('set max_allowed_packet=67108864')
+mydb.execute('set max_allowed_packet=67108864')
 index_name = "search-engine"
 # sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 #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
@@ -856,7 +856,7 @@ async def search_res(item: query_item):
     if item:
         print(f"Received item: {item.dict()} ")
         # mycursor.execute("CREATE TABLE IF NOT EXISTS search_queries (id INT AUTO_INCREMENT PRIMARY KEY, query VARCHAR(255),ip VARCHAR(255), datetime DATETIME)")
-        sql = '''INSERT INTO queries (user_id, query, ip, datetime, location) VALUES (?, ?, ?, ?, ?)'''
+        sql = '''INSERT INTO queries (user_id, query, ip, datetime, location) VALUES (%s, %s, %s, %s, %s)'''
         values = (item.user_id,item.query,str(item.ip), datetime.now(),str(item.location))
     
         mycursor.execute(sql, values)
@@ -923,7 +923,7 @@ async def signup(user:user):
             return {"message": res[0]}
         else:
             # Insert new user
-            sql = '''INSERT INTO users (name, email, phone, location, registered_on) VALUES (?, ?, ?, ?, ?)'''
+            sql = '''INSERT INTO users (name, email, phone, location, registered_on) VALUES (%s, %s, %s, %s, %s)'''
             values = (user.name, user.email, user.phone, user.location, datetime.now())
             mycursor.execute(sql, values)
             mydb.commit()
@@ -952,6 +952,6 @@ app.include_router(my_router)
  
 add_routes(app, retriever,path="/chat") 
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="localhost", port=8000)
+# if __name__ == "__main__":
+#     import uvicorn
+#     uvicorn.run(app, host="localhost", port=8000)
