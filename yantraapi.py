@@ -32,7 +32,16 @@ import openai
 import pickle
 # from dotenv import load_dotenv, dotenv_values 
 import os
-openai.api_key = os.getenv("sk-proj-dEYnSd1UOA3nFhTzlBj1T3BlbkFJ179qs6h9elueceBPvGk1")
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+openai_api_key=os.getenv("openai_api_key")
+
+openai.api_key = openai_api_key
+print(openai_api_key)
 # sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 
 with open('final.pickle', 'rb') as handle:
@@ -67,18 +76,17 @@ mycursor = mydb.cursor()
 
 # mydb.execute('set max_allowed_packet=67108864')
 index_name = "search-engine"
-openai_api_key=os.getenv("sk-proj-dEYnSd1UOA3nFhTzlBj1T3BlbkFJ179qs6h9elueceBPvGk1")
 # sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 #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
-embeddings = OpenAIEmbeddings(openai_api_key="sk-proj-dEYnSd1UOA3nFhTzlBj1T3BlbkFJ179qs6h9elueceBPvGk1")
+embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
 
 # initialize pinecone
 # pinecone.init(
 #     api_key="9db53de5-e4af-4151-a24d-995577de48cf",  # find at app.pinecone.io a242896b-4f43-484a-9d48-a43fa5a71481
 #     environment="gcp-starter",  # next to api key in console
 # )
-
-pinecone=Pinecone(api_key="34e9a537-88b9-4b3a-b0ab-17fa43483230",  # find at app.pinecone.io a242896b-4f43-484a-9d48-a43fa5a71481
+pinecone_key=os.getenv("pinecone_api")
+pinecone=Pinecone(api_key=pinecone_key,  # find at app.pinecone.io a242896b-4f43-484a-9d48-a43fa5a71481
 )
 
 index = pinecone.Index(index_name)
