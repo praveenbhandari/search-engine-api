@@ -77,8 +77,8 @@ except:
 # mydb.execute('set max_allowed_packet=67108864')
 # index_name = "search-engine"
 
-# index_name="search-engine-updated"
-index_name="icj"
+# index_name="search-update-final-shit"
+index_name="search-dev"
 # sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 #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
 embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key1)
@@ -594,11 +594,16 @@ def results(query):
                         return parsed_date.strftime("%Y-%m-%d")
                 except ValueError:
                     pass
-
+            # print("dateee : ",date_str)
+            
             if "-" in date_str:
-                d, m, y = date_str.split("-")
-                date_str = f"{m}-{d}-{y}"
-                return date_str
+                try:
+                    d, m, y = date_str.split("-")
+                    date_str = f"{m}-{d}-{y}"
+                    return date_str
+                except Exception as e:
+                    print(e)
+                    return "00-00-00"
             elif "/" in date_str:
                 d, m, y = date_str.split("/")
                 date_str = f"{m}-{d}-{y}"
@@ -943,6 +948,29 @@ async def signup(user:user):
             res=mycursor.fetchone()
             if res:
                 return {"message": res[0]}
+
+        # return {"message": 0}
+    except Exception as e:
+        mydb.rollback()
+        return {"error": str(e)}
+
+@my_router.post("/feedback")
+async def feedback(item:query_item):
+    try:
+        # mycursor.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, name VARCHAR(255),email VARCHAR(255), phone VARCHAR(255),location VARCHAR(255), registered_on DATETIME)")
+        mycursor.execute("CREATE TABLE IF NOT EXISTS feedback (id INTEGER PRIMARY KEY, user_id INT, feedback VARCHAR(255),ip VARCHAR(255), datetime DATETIME, location VARCHAR(255), FOREIGN KEY (user_id) REFERENCES users(user_id))")
+        # mycursor.execute("CREATE TABLE IF NOT EXISTS sessions (id INTEGER PRIMARY KEY, ip VARCHAR(255), device VARCHAR(255),total_time VARCHAR(255), start_time DATETIME, end_time DATETIME)")
+        # mycursor.execute("CREATE TABLE IF NOT EXISTS feedback (user_id INTEGER AUTO_INCREMENT PRIMARY KEY, feedback VARCHAR(255),location VARCHAR(255), timee DATETIME)")
+       
+        # Check if user already exists
+        if item:
+            print(f"Received item: {item.dict()} ")
+            # mycursor.execute("CREATE TABLE IF NOT EXISTS search_queries (id INT AUTO_INCREMENT PRIMARY KEY, query VARCHAR(255),ip VARCHAR(255), datetime DATETIME)")
+            sql = '''INSERT INTO feedback (user_id, feedback, ip, datetime, location) VALUES (%s, %s, %s, %s, %s)'''
+            values = (item.user_id,item.query,str(item.ip), datetime.now(),str(item.location))
+        
+            mycursor.execute(sql, values)
+            mydb.commit()
 
         # return {"message": 0}
     except Exception as e:
