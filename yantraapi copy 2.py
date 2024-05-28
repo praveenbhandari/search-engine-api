@@ -41,7 +41,7 @@ load_dotenv()
 openai_api_key1=os.getenv("openai_api_key")
 
 openai.api_key = openai_api_key1
-# print(openai_api_key1)
+print(openai_api_key1)
 # sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 
 with open('final.pickle', 'rb') as handle:
@@ -52,149 +52,25 @@ os.environ["TOKENIZERS_PARALLELISM"] = "true"
 import sqlite3
 
 # mydb = sqlite3.connect('user_data.db') 
-from mysql.connector import errorcode
-from datetime import datetime
-import time
 
-# def connect_to_db():
-    # try:
-    #     connection = mysql.connector.connect(
-    #         host="search-engine.ckkhapdb5dit.ap-south-1.rds.amazonaws.com",
-    #         user="admin",
-    #         password="Praveen123",
-    #         database="search_engine_dev"
-    #         )
-    #     return connection
-    # except mysql.connector.Error as err:
-    #     if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-    #         print("Something is wrong with your user name or password")
-    #     elif err.errno == errorcode.ER_BAD_DB_ERROR:
-    #         print("Database does not exist")
-    #     else:
-    #         print(err)
-    # return None
 
-def connect_to_db():
-    try:
-        connection = mysql.connector.connect(
-            host="search-engine.ckkhapdb5dit.ap-south-1.rds.amazonaws.com",
-            user="admin",
-            password="Praveen123",
-            database="search_engine_dev"
-            )
-        print("connected")
-        return connection
-    except mysql.connector.Error as err:
-        print(f"Error: {err}")
-    return None
+mydb = mysql.connector.connect(
+  host="search-engine.ckkhapdb5dit.ap-south-1.rds.amazonaws.com",
+  user="admin",
+  password="Praveen123",
+  # database="test"
+)
 
-def execute_with_retry(query, values=None, retries=3):
+mycursor = mydb.cursor()
+
+try:
     
-    attempt = 0
-    while attempt < retries:
-        try:
-            # print("execut try")
-            connection = connect_to_db()
-            if connection is None:
-                print("Failed to connect to the database.")
-                return None
-            
-            cursor = connection.cursor()
-            cursor.execute(query, values)
-            # print("bef cursour")
-            result = cursor.fetchall() if cursor.with_rows else None
-            connection.commit()
-            cursor.close()
-            connection.close()
-            return result
-        except mysql.connector.Error as err:
-            print(f"Error: {err}")
-            attempt += 1
-            print(f"Retrying... ({attempt}/{retries})")
-            time.sleep(3)  # wait for 5 seconds before retrying
-    print("Failed to execute query after multiple attempts.")
-    return None
-
-def insert_user_and_get_id(user):
-    try:
-        # Create tables if they don't exist
-        create_users_table = """
-        CREATE TABLE IF NOT EXISTS users (
-            user_id INTEGER AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(255),
-            email VARCHAR(255),
-            phone VARCHAR(255),
-            location VARCHAR(255),
-            registered_on DATETIME
-        )
-        """
-        create_queries_table = """
-        CREATE TABLE IF NOT EXISTS queries (
-            id INTEGER AUTO_INCREMENT PRIMARY KEY,
-            user_id INT,
-            query VARCHAR(255),
-            ip VARCHAR(255),
-            datetime DATETIME,
-            location VARCHAR(255),
-            FOREIGN KEY (user_id) REFERENCES users(user_id)
-        )
-        """
-        create_sessions_table = """
-        CREATE TABLE IF NOT EXISTS sessions (
-            id INTEGER AUTO_INCREMENT PRIMARY KEY,
-            ip VARCHAR(255),
-            device VARCHAR(255),
-            total_time VARCHAR(255),
-            start_time DATETIME,
-            end_time DATETIME
-        )
-        """
-        execute_with_retry(create_users_table)
-        execute_with_retry(create_queries_table)
-        execute_with_retry(create_sessions_table)
-
-        # Check if user already exists
-        select_user_query = "SELECT user_id FROM users WHERE email = %s AND phone = %s"
-        result = execute_with_retry(select_user_query, (user.email, user.phone))
-        # print(result[0][0])
-        if result:
-            return {"message": result[0][0]}
-        else:
-            # Insert new user
-            insert_user_query = '''
-            INSERT INTO users (name, email, phone, location, registered_on)
-            VALUES (%s, %s, %s, %s, %s)
-            '''
-            values = (user.name, user.email, user.phone, user.location, datetime.now())
-            execute_with_retry(insert_user_query, values)
-
-            # Retrieve the user ID of the newly inserted user
-            result = execute_with_retry(select_user_query, (user.email, user.phone))
-            # print(result[0][0])
-            if result:
-                return {"message": result[0][0]}
-
-        return {"message": 0}
-    except Exception as e:
-        return {"error": str(e)}
-
-# mydb = mysql.connector.connect(
-#   host="search-engine.ckkhapdb5dit.ap-south-1.rds.amazonaws.com",
-#   user="admin",
-#   password="Praveen123",
-#   # database="test"
-# )
-
-# mycursor = mydb.cursor()
-
-# try:
-    
-#     mycursor.execute("use search_engine_dev")
-#     print("using db")
-# except:
-#     mycursor.execute("CREATE database search_engine_dev")
-#     mycursor.execute("use search_engine_dev")
-#     print("creating db")
+    mycursor.execute("use search_engine_dev")
+    print("using db")
+except:
+    mycursor.execute("CREATE database search_engine_dev")
+    mycursor.execute("use search_engine_dev")
+    print("creating db")
 
 
 
@@ -986,15 +862,13 @@ async def search_res(item: query_item):
     # mydb.commit()
     # response=retriever.get_relevant_documents(str(query.query))
     if item:
-        # print
         print(f"Received item: {item.dict()} ")
         # mycursor.execute("CREATE TABLE IF NOT EXISTS search_queries (id INT AUTO_INCREMENT PRIMARY KEY, query VARCHAR(255),ip VARCHAR(255), datetime DATETIME)")
         sql = '''INSERT INTO queries (user_id, query, ip, datetime, location) VALUES (%s, %s, %s, %s, %s)'''
         values = (item.user_id,item.query,str(item.ip), datetime.now(),str(item.location))
-        # print('sent')
-        execute_with_retry(sql,values)
-        # mycursor.execute(sql, values)
-        # mydb.commit()
+    
+        mycursor.execute(sql, values)
+        mydb.commit()
         result,ids,word,q_score=querr(item.query)
 
         # print(item)
@@ -1049,63 +923,59 @@ async def signup(user:user):
         # mycursor.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, name VARCHAR(255),email VARCHAR(255), phone VARCHAR(255),location VARCHAR(255), registered_on DATETIME)")
         # mycursor.execute("CREATE TABLE IF NOT EXISTS queries (id INTEGER PRIMARY KEY, user_id INT, query VARCHAR(255),ip VARCHAR(255), datetime DATETIME, location VARCHAR(255), FOREIGN KEY (user_id) REFERENCES users(user_id))")
         # mycursor.execute("CREATE TABLE IF NOT EXISTS sessions (id INTEGER PRIMARY KEY, ip VARCHAR(255), device VARCHAR(255),total_time VARCHAR(255), start_time DATETIME, end_time DATETIME)")
-       
-        # mycursor.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255),email VARCHAR(255), phone VARCHAR(255),location VARCHAR(255), registered_on DATETIME)")
-        # mycursor.execute("CREATE TABLE IF NOT EXISTS queries (id INTEGER AUTO_INCREMENT PRIMARY KEY, user_id INT, query VARCHAR(255),ip VARCHAR(255), datetime DATETIME, location VARCHAR(255), FOREIGN KEY (user_id) REFERENCES users(user_id))")
-        # mycursor.execute("CREATE TABLE IF NOT EXISTS sessions (id INTEGER AUTO_INCREMENT PRIMARY KEY, ip VARCHAR(255), device VARCHAR(255),total_time VARCHAR(255), start_time DATETIME, end_time DATETIME)")
+        mycursor.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255),email VARCHAR(255), phone VARCHAR(255),location VARCHAR(255), registered_on DATETIME)")
+        mycursor.execute("CREATE TABLE IF NOT EXISTS queries (id INTEGER AUTO_INCREMENT PRIMARY KEY, user_id INT, query VARCHAR(255),ip VARCHAR(255), datetime DATETIME, location VARCHAR(255), FOREIGN KEY (user_id) REFERENCES users(user_id))")
+        mycursor.execute("CREATE TABLE IF NOT EXISTS sessions (id INTEGER AUTO_INCREMENT PRIMARY KEY, ip VARCHAR(255), device VARCHAR(255),total_time VARCHAR(255), start_time DATETIME, end_time DATETIME)")
 
-        # # Check if user already exists
-        # query = "SELECT user_id FROM users WHERE email = %s AND phone = %s"
-        # # res=mycursor.execute(query, (user.email, user.phone)).fetchone()
-        # mycursor.execute(query, (user.email, user.phone))
-        # res=mycursor.fetchone()
-        res=insert_user_and_get_id(user)
-        # print(res)
+        # Check if user already exists
+        query = "SELECT user_id FROM users WHERE email = %s AND phone = %s"
+        # res=mycursor.execute(query, (user.email, user.phone)).fetchone()
+        mycursor.execute(query, (user.email, user.phone))
+        res=mycursor.fetchone()
+
         if res:
-            return res
+            return {"message": res[0]}
         else:
             # Insert new user
             sql = '''INSERT INTO users (name, email, phone, location, registered_on) VALUES (%s, %s, %s, %s, %s)'''
             values = (user.name, user.email, user.phone, user.location, datetime.now())
-            execute_with_retry.execute(sql, values)
-            # mydb.commit()
+            mycursor.execute(sql, values)
+            mydb.commit()
 
-            # query = "SELECT user_id FROM users WHERE email = %s AND phone = %s"
+            query = "SELECT user_id FROM users WHERE email = %s AND phone = %s"
             # res=mycursor.execute(query, (user.email, user.phone)).fetchone()
-            # mycursor.execute(query, (user.email, user.phone))
-            # res=mycursor.fetchone()
-            res=insert_user_and_get_id(user)
-            # print(res.message)
+            mycursor.execute(query, (user.email, user.phone))
+            res=mycursor.fetchone()
             if res:
-                return res
+                return {"message": res[0]}
 
         # return {"message": 0}
     except Exception as e:
-        # mydb.rollback(
+        mydb.rollback()
         return {"error": str(e)}
 
-# @my_router.post("/feedback")
-# async def feedback(item:query_item):
-    # try:
-    #     # mycursor.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, name VARCHAR(255),email VARCHAR(255), phone VARCHAR(255),location VARCHAR(255), registered_on DATETIME)")
-    #     mycursor.execute("CREATE TABLE IF NOT EXISTS feedback (id INTEGER PRIMARY KEY, user_id INT, feedback VARCHAR(255),ip VARCHAR(255), datetime DATETIME, location VARCHAR(255), FOREIGN KEY (user_id) REFERENCES users(user_id))")
-    #     # mycursor.execute("CREATE TABLE IF NOT EXISTS sessions (id INTEGER PRIMARY KEY, ip VARCHAR(255), device VARCHAR(255),total_time VARCHAR(255), start_time DATETIME, end_time DATETIME)")
-    #     # mycursor.execute("CREATE TABLE IF NOT EXISTS feedback (user_id INTEGER AUTO_INCREMENT PRIMARY KEY, feedback VARCHAR(255),location VARCHAR(255), timee DATETIME)")
+@my_router.post("/feedback")
+async def feedback(item:query_item):
+    try:
+        # mycursor.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, name VARCHAR(255),email VARCHAR(255), phone VARCHAR(255),location VARCHAR(255), registered_on DATETIME)")
+        mycursor.execute("CREATE TABLE IF NOT EXISTS feedback (id INTEGER PRIMARY KEY, user_id INT, feedback VARCHAR(255),ip VARCHAR(255), datetime DATETIME, location VARCHAR(255), FOREIGN KEY (user_id) REFERENCES users(user_id))")
+        # mycursor.execute("CREATE TABLE IF NOT EXISTS sessions (id INTEGER PRIMARY KEY, ip VARCHAR(255), device VARCHAR(255),total_time VARCHAR(255), start_time DATETIME, end_time DATETIME)")
+        # mycursor.execute("CREATE TABLE IF NOT EXISTS feedback (user_id INTEGER AUTO_INCREMENT PRIMARY KEY, feedback VARCHAR(255),location VARCHAR(255), timee DATETIME)")
        
-    #     # Check if user already exists
-    #     if item:
-    #         print(f"Received item: {item.dict()} ")
-    #         # mycursor.execute("CREATE TABLE IF NOT EXISTS search_queries (id INT AUTO_INCREMENT PRIMARY KEY, query VARCHAR(255),ip VARCHAR(255), datetime DATETIME)")
-    #         sql = '''INSERT INTO feedback (user_id, feedback, ip, datetime, location) VALUES (%s, %s, %s, %s, %s)'''
-    #         values = (item.user_id,item.query,str(item.ip), datetime.now(),str(item.location))
+        # Check if user already exists
+        if item:
+            print(f"Received item: {item.dict()} ")
+            # mycursor.execute("CREATE TABLE IF NOT EXISTS search_queries (id INT AUTO_INCREMENT PRIMARY KEY, query VARCHAR(255),ip VARCHAR(255), datetime DATETIME)")
+            sql = '''INSERT INTO feedback (user_id, feedback, ip, datetime, location) VALUES (%s, %s, %s, %s, %s)'''
+            values = (item.user_id,item.query,str(item.ip), datetime.now(),str(item.location))
         
-    #         mycursor.execute(sql, values)
-    #         mydb.commit()
+            mycursor.execute(sql, values)
+            mydb.commit()
 
-    #     # return {"message": 0}
-    # except Exception as e:
-    #     mydb.rollback()
-    #     return {"error": str(e)}
+        # return {"message": 0}
+    except Exception as e:
+        mydb.rollback()
+        return {"error": str(e)}
 
 
 app.add_middleware(
