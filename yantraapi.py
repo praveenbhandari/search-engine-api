@@ -139,6 +139,17 @@ def insert_user_and_get_id(user):
             FOREIGN KEY (user_id) REFERENCES users(user_id)
         )
         """
+        create_feedback_table = """
+        CREATE TABLE IF NOT EXISTS feedback (
+            id INTEGER AUTO_INCREMENT PRIMARY KEY,
+            user_id INT,
+            feedback VARCHAR(255),
+            ip VARCHAR(255),
+            datetime DATETIME,
+            location VARCHAR(255),
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
+        )
+        """
         create_sessions_table = """
         CREATE TABLE IF NOT EXISTS sessions (
             id INTEGER AUTO_INCREMENT PRIMARY KEY,
@@ -152,6 +163,7 @@ def insert_user_and_get_id(user):
         execute_with_retry(create_users_table)
         execute_with_retry(create_queries_table)
         execute_with_retry(create_sessions_table)
+        execute_with_retry(create_feedback_table)
 
         # Check if user already exists
         select_user_query = "SELECT user_id FROM users WHERE email = %s AND phone = %s"
@@ -1012,6 +1024,47 @@ async def search_res(item: query_item):
         return result,word,q_score
     else:
         return 
+
+@my_router.post("/feedback")
+async def feedback(item: query_item):
+    if item:
+        print(f"Received item: {item.dict()} ")
+        create_feedback_table = """
+        CREATE TABLE IF NOT EXISTS feedback (
+            id INTEGER AUTO_INCREMENT PRIMARY KEY,
+            user_id INT,
+            feedback VARCHAR(255),
+            ip VARCHAR(255),
+            datetime DATETIME,
+            location VARCHAR(255),
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
+        )
+        """
+        execute_with_retry(create_feedback_table)
+        sql = '''INSERT INTO feedback (user_id, feedback, ip, datetime, location) VALUES (%s, %s, %s, %s, %s)'''
+        values = (item.user_id,item.query,str(item.ip), datetime.now(),str(item.location))
+        # print('sent')
+        execute_with_retry(sql,values)
+        print("sett")
+        # mycursor.execute(sql, values)
+        # mydb.commit()
+        # result,ids,word,q_score=querr(item.query)
+
+        # print(item)
+        # return item
+    # print((a))
+    # for i in a:
+    # print(type(lemmatize(a)))
+    # response=results(query.query)
+
+    # data=
+    # for s,d,_ in resultss:
+    #     scores.append(s)
+    # for i in 
+
+    #     return result,word,q_score
+    # else:
+    #     return 
 
 # from flask_cors import CORS
 # @my_router.post("/search1")
