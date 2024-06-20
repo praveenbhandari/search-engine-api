@@ -215,6 +215,7 @@ def insert_user_and_get_id(user):
 
 # index_name="search-update-final-shit"
 index_name="search-dev"
+dev_index_name="icj-test"
 # sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 #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
 embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key1)
@@ -229,6 +230,7 @@ pinecone=Pinecone(api_key=pinecone_key,  # find at app.pinecone.io a242896b-4f43
 )
 
 index = pinecone.Index(index_name)
+dev_index = pinecone.Index(dev_index_name)
 # bm25= BM25Encoder().default()
 bm25=BM25Encoder().load("bm25_values1.json")
 
@@ -254,6 +256,9 @@ stemmer = PorterStemmer()
 
 retriever = PineconeHybridSearchRetriever(
     embeddings=embeddings, sparse_encoder=bm25, index=index,alpha=0.1,top_k=100,
+)
+dev_retriever = PineconeHybridSearchRetriever(
+    embeddings=embeddings, sparse_encoder=bm25, index=dev_index,alpha=0.1,top_k=100,
 )
 
 # async def fetch():
@@ -536,6 +541,21 @@ def searchh(texttt):
 #   print(texttt)
   if texttt:
     pine = retriever.get_relevant_documents(str(texttt))
+    # print(pine)
+    # for i in pine:
+    #   print(i.page_content)
+    content=[i.page_content for i in pine]
+    meta=[i.metadata for i in pine]
+    #   print(content)
+    #   print(meta)
+    procesedd_text=[process(content[i]+str(meta[i])) for i in range(len(content))]
+    return pine,procesedd_text
+  else:
+      return 
+def dev_searchh(texttt):
+#   print(texttt)
+  if texttt:
+    pine = dev_retriever.get_relevant_documents(str(texttt))
     # print(pine)
     # for i in pine:
     #   print(i.page_content)
@@ -884,6 +904,188 @@ def results(query):
     # # print(resultss)
     return resultss, ids, data
 
+
+
+def dev_results(query):
+    pine, textss = dev_searchh(query)
+    score, ids, res, q_score = search(textss, query)
+    def get_date(document):
+        month_dict = {
+            'January': '01', 'February': '02', 'March': '03', 'April': '04',
+            'May': '05', 'June': '06', 'July': '07', 'August': '08',
+            'September': '09', 'October': '10', 'November': '11', 'December': '12'
+        }
+        try:
+            date_str = document.metadata.get("Date", "Not found")
+            if date_str == "Not found":
+                return "0000-01-01"
+
+            for fmt in ['%m-%d-%Y', '%m-%B-%Y', '%d %B %Y']:
+                try:
+                    if fmt == '%d %B %Y':
+                        # For the format '%d %B %Y', parse it directly and convert to desired format
+                        parsed_date = datetime.strptime(date_str, fmt)
+                        month_number = month_dict.get(parsed_date.strftime("%B"))
+                        return f"{parsed_date.year}-{month_number}-{parsed_date.day}"
+                    else:
+                        parsed_date = datetime.strptime(date_str, fmt)
+                        return parsed_date.strftime("%Y-%m-%d")
+                except ValueError:
+                    pass
+            # print("dateee : ",date_str)
+            
+            if "-" in date_str:
+                try:
+                    d, m, y = date_str.split("-")
+                    date_str = f"{m}-{d}-{y}"
+                    return date_str
+                except Exception as e:
+                    print(e)
+                    return "00-00-00"
+            elif "/" in date_str:
+                d, m, y = date_str.split("/")
+                date_str = f"{m}-{d}-{y}"
+                return date_str
+            else:
+                print("Date format not recognized", date_str)
+                return "11-11-11"
+        except KeyError:
+            print("Date not found in document metadata")
+            return None
+
+
+    resultss = []
+    for i in ids:
+        # print("---------",pine[i].metadata["Case Name"])
+        try:
+            if pine[i].metadata["Case Name"] == "Not Available" or pine[i].metadata["Case Name"] == "Not found"  :
+                    resultss.append(("Relevant:"+score[i], pine[i], q_score[i]))
+            else:
+                # print("elseeeeee",pine[i].metadata["Case Name"])
+            
+                if float(score[i]) < 0:
+                    resultss.append((0, pine[i], (0, 0, 0)))
+                else: 
+                    resultss.append((score[i], pine[i], q_score[i]))
+        except Exception as e:
+            print(e)
+            resultss.append(("Relevant:"+score[i], pine[i], (0,0,0)))
+    # for score_value, document, q_score_value in resultss:
+    #     document.metadata["Date"] = get_date(document)  # Set the value of the Date field in document.metadata
+    for i in resultss:
+        if len(i) == 3:
+            score_value,document,q_score_value=i
+            document.metadata["Date"] = get_date(document)
+        else:
+            print("error in datess", i)
+
+    # def round_score(score):
+    #     return round(float(score))
+    
+
+    # def get_date(document):
+    #     month_dict = {
+    #         'January': '01', 'February': '02', 'March': '03', 'April': '04',
+    #         'May': '05', 'June': '06', 'July': '07', 'August': '08',
+    #         'September': '09', 'October': '10', 'November': '11', 'December': '12'
+    #     }
+    #     try:
+    #         date_str = document.metadata.get("Date", "Not found")
+    #         if date_str == "Not found":
+    #             return datetime.strptime("9999-12-31", '%Y-%m-%d')
+
+    #         for fmt in ['%m-%d-%Y', '%m-%B-%Y', '%d %B %Y']:
+    #             try:
+    #                 if fmt == '%d %B %Y':
+    #                     # For the format '%d %B %Y', parse it directly and convert to desired format
+    #                     parsed_date = datetime.strptime(date_str, fmt)
+    #                     month_number = month_dict.get(parsed_date.strftime("%B"))
+    #                     return datetime.strptime(f"{parsed_date.year}-{month_number}-{parsed_date.day}", '%Y-%m-%d')
+    #                 else:
+    #                     parsed_date = datetime.strptime(date_str, fmt)
+    #                     return parsed_date
+    #             except ValueError:
+    #                 pass
+
+    #         if "-" in date_str:
+    #             d, m, y = date_str.split("-")
+    #             date_str = f"{m}-{d}-{y}"
+    #             parsed_date = datetime.strptime(date_str, '%m-%d-%Y')
+    #             return parsed_date
+    #         elif "/" in date_str:
+    #             d, m, y = date_str.split("/")
+    #             date_str = f"{m}-{d}-{y}"
+    #             parsed_date = datetime.strptime(date_str, '%m-%d-%Y')
+    #             return parsed_date
+    #         else:
+    #             print("Date format not recognized", date_str)
+    #             return None
+    #     except KeyError:
+    #         print("Date not found in document metadata")
+    #         return None
+    # def get_date(document):
+    #     month_dict = {
+    #         'January': '01', 'February': '02', 'March': '03', 'April': '04',
+    #         'May': '05', 'June': '06', 'July': '07', 'August': '08',
+    #         'September': '09', 'October': '10', 'November': '11', 'December': '12'
+    #     }
+    #     try:
+    #         date_str = document.metadata.get("Date", "Not found")
+    #         if date_str == "Not found":
+    #             return "9999-12-31"
+
+    #         for fmt in ['%m-%d-%Y', '%m-%B-%Y', '%d %B %Y']:
+    #             try:
+    #                 if fmt == '%d %B %Y':
+    #                     # For the format '%d %B %Y', parse it directly and convert to desired format
+    #                     parsed_date = datetime.strptime(date_str, fmt)
+    #                     month_number = month_dict.get(parsed_date.strftime("%B"))
+    #                     return f"{parsed_date.year}-{month_number}-{parsed_date.day}"
+    #                 else:
+    #                     parsed_date = datetime.strptime(date_str, fmt)
+    #                     return parsed_date.strftime("%Y-%m-%d")
+    #             except ValueError:
+    #                 pass
+
+    #         if "-" in date_str:
+    #             d, m, y = date_str.split("-")
+    #             date_str = f"{m}-{d}-{y}"
+    #             return date_str
+    #         elif "/" in date_str:
+    #             d, m, y = date_str.split("/")
+    #             date_str = f"{m}-{d}-{y}"
+    #             return date_str
+    #         else:
+    #             print("Date format not recognized", date_str)
+    #             return None
+    #     except KeyError:
+    #         print("Date not found in document metadata")
+    #         return None
+
+
+    # grouped_results = {}
+    # for score_value, document, q_score_value in resultss:
+    #     document.metadata["Date"] = get_date(document)  # Set the value of the Date field in document.metadata
+
+    #     rounded_score = round_score(score_value)
+    #     if 1 <= rounded_score <= 100:
+    #         if rounded_score not in grouped_results:
+    #             grouped_results[rounded_score] = []
+    #         grouped_results[rounded_score].append((score_value, document, q_score_value))
+
+    # # Now, sort the documents within each score group by date
+    # for score in grouped_results:
+    #     grouped_results[score] = sorted(grouped_results[score], key=lambda x: get_date(x[1]) if isinstance(get_date(x[1]), datetime) else datetime.max, reverse=False)
+
+    data = []
+    # for i in grouped_results:
+    #     for j in grouped_results.get(i):
+    #         # print("------------")
+    #         # print(i)
+    #         data.append(j)
+    # # print(resultss)
+    return resultss, ids, data
+
 def sim_test(query):
     tokens = tokenizer1(query, return_tensors='pt')
     output = model1(**tokens)
@@ -972,6 +1174,46 @@ def querr(query):
     resultss,ids,q_score=results(query)  
 # results("ICC01/12-01/18")  
     return resultss,ids,unique_list[:9],q_score
+def dev_querr(query):
+    words = [w for w, s in sim_test(query).items() if len(w) > 2]
+    
+    wordss=[]
+    
+    wordss.append(query)
+    for i in query.split():
+        wordss.append(i)
+
+    a=['procedural', 'applicant', 'case', 'citations', 'communication', 'court', 'date', 'decisions', 'details', 'document', 'history', 'id', 'impact', 'involved', 'issue','judges', 'key', 'legal', 'matter', 'parties', 'points', 'principle', 'procedural', 'references', 'representatives', 'rulings','significance', 'situation', 'subject', 'submission', 'substantive', 'summary', 'tribunal', 'victim']
+    # a.append(stop_words)
+    for i in stop_words:
+        a.append(i)
+    # print(a)
+    for i in words:
+        # print(i)
+        if i in a:
+            if i in query.lower().split():
+                wordss.append(i)
+            continue
+        else:
+            wordss.append(i)    
+        # print(words)
+    # lem=[words]
+    seen = set()
+    unique_list = []
+    for item in wordss:
+        if item not in seen:
+            unique_list.append(item)
+            seen.add(item)
+    # print(unique_list)
+    # print(lem)
+    # words_string = " "
+    # for i in words[:5]:
+    #     words_string = words_string+" "+i
+
+    # print(words_string)
+    resultss,ids,q_score=dev_results(query)  
+# results("ICC01/12-01/18")  
+    return resultss,ids,unique_list[:9],q_score
 
 # def lemmatize(words):
 #     b=set()
@@ -1008,6 +1250,42 @@ async def search_res(item: query_item):
         # mycursor.execute(sql, values)
         # mydb.commit()
         result,ids,word,q_score=querr(item.query)
+
+        # print(item)
+        # return item
+    # print((a))
+    # for i in a:
+    # print(type(lemmatize(a)))
+    # response=results(query.query)
+
+    # data=
+    # for s,d,_ in resultss:
+    #     scores.append(s)
+    # for i in 
+
+        return result,word,q_score
+    else:
+        return 
+@my_router.post("/dev_search")
+async def dev_search_res(item: query_item):
+    # print(query.query)
+    # mycursor.execute("CREATE TABLE IF NOT EXISTS search_queries (id INT AUTO_INCREMENT PRIMARY KEY, query VARCHAR(255), datetime DATETIME)")
+    # sql = "INSERT INTO search_queries (query, datetime) VALUES (%s, %s)"
+    # values = (query.query, datetime.now())
+    # mycursor.execute(sql, values)
+    # mydb.commit()
+    # response=retriever.get_relevant_documents(str(query.query))
+    if item:
+        # print
+        print(f"Received item: {item.dict()} ")
+        # mycursor.execute("CREATE TABLE IF NOT EXISTS search_queries (id INT AUTO_INCREMENT PRIMARY KEY, query VARCHAR(255),ip VARCHAR(255), datetime DATETIME)")
+        sql = '''INSERT INTO queries (user_id, query, ip, datetime, location) VALUES (%s, %s, %s, %s, %s)'''
+        values = (item.user_id,"dev "+item.query,str(item.ip), datetime.now(),str(item.location))
+        # print('sent')
+        execute_with_retry(sql,values)
+        # mycursor.execute(sql, values)
+        # mydb.commit()
+        result,ids,word,q_score=dev_querr(item.query)
 
         # print(item)
         # return item
