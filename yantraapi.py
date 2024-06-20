@@ -214,7 +214,7 @@ def insert_user_and_get_id(user):
 # index_name = "search-engine"
 
 # index_name="search-update-final-shit"
-index_name="search-dev"
+index_name="dev"
 dev_index_name="icj-test"
 # sk-proj-lLgqJdKn8W8Fet0IDHONT3BlbkFJKEFqv6UITUFEYG3WZUtM
 #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
