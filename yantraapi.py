@@ -257,6 +257,7 @@ stemmer = PorterStemmer()
 retriever = PineconeHybridSearchRetriever(
     embeddings=embeddings, sparse_encoder=bm25, index=index,alpha=0.1,top_k=100,
 )
+print("dev_retriever")
 dev_retriever = PineconeHybridSearchRetriever(
     embeddings=embeddings, sparse_encoder=bm25, index=dev_index,alpha=0.1,top_k=100,
 )
@@ -554,6 +555,8 @@ def searchh(texttt):
       return 
 def dev_searchh(texttt):
 #   print(texttt)
+
+  print("dev_search")
   if texttt:
     pine = dev_retriever.get_relevant_documents(str(texttt))
     # print(pine)
@@ -907,6 +910,8 @@ def results(query):
 
 
 def dev_results(query):
+
+    print("dev_results") 
     pine, textss = dev_searchh(query)
     score, ids, res, q_score = search(textss, query)
     def get_date(document):
@@ -1176,7 +1181,7 @@ def querr(query):
     return resultss,ids,unique_list[:9],q_score
 def dev_querr(query):
     words = [w for w, s in sim_test(query).items() if len(w) > 2]
-    
+    print("dev_querr")
     wordss=[]
     
     wordss.append(query)
@@ -1275,6 +1280,7 @@ async def dev_search_res(item: query_item):
     # mycursor.execute(sql, values)
     # mydb.commit()
     # response=retriever.get_relevant_documents(str(query.query))
+    print("dev_api")
     if item:
         # print
         print(f"Received item: {item.dict()} ")
